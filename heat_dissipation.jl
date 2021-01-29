@@ -62,32 +62,18 @@ function do_compute!(row_num, col_num, new_temp_matrix, temp_matrix, conduct_mat
     max_abs_diff = 0.0
     @inbounds @simd for j in 2:(col_num+1)
         @inbounds @simd for i in 2:(row_num+1)
-            @views local_temp_matrix = temp_matrix[i-1:i+1 , j-1:j+1]
+            direct_neighbors = (temp_matrix[i - 1, j] + temp_matrix[i + 1, j]
+                             + temp_matrix[i, j - 1] + temp_matrix[i, j + 1])
 
-            direct_neighbors = (local_temp_matrix[1,2] + local_temp_matrix[3,2]
-                             + local_temp_matrix[2,1] + local_temp_matrix[2,3])
-
-            indirect_neighbours = (local_temp_matrix[1,1] + local_temp_matrix[1,3]
-                                + local_temp_matrix[3,1] + local_temp_matrix[3,3])
+            indirect_neighbours = (temp_matrix[i - 1, j - 1] + temp_matrix[i - 1, j + 1]
+                                + temp_matrix[i + 1, j - 1] + temp_matrix[i + 1, j + 1])
 
             weight = conduct_matrix[i, j]
             rest_weight = 1 - weight
 
-            new_temp_matrix[i, j] = (local_temp_matrix[2, 2] *weight
+            new_temp_matrix[i, j] = (temp_matrix[i, j] * weight
                                   + direct_neighbors * (rest_weight * direct_fixed)
                                   + indirect_neighbours * (rest_weight * indirect_fixed))
-            # direct_neighbors = (temp_matrix[i - 1, j] + temp_matrix[i + 1, j]
-            #                  + temp_matrix[i, j - 1] + temp_matrix[i, j + 1])
-            #
-            # indirect_neighbours = (temp_matrix[i - 1, j - 1] + temp_matrix[i - 1, j + 1]
-            #                     + temp_matrix[i + 1, j - 1] + temp_matrix[i + 1, j + 1])
-            #
-            # weight = conduct_matrix[i, j]
-            # rest_weight = 1 - weight
-            #
-            # new_temp_matrix[i, j] = (temp_matrix[i, j] * weight
-            #                       + direct_neighbors * (rest_weight * direct_fixed)
-            #                       + indirect_neighbours * (rest_weight * indirect_fixed))
             temp_val = abs(new_temp_matrix[i, j] - temp_matrix[i, j])
             max_abs_diff = max_not_nan(max_abs_diff, temp_val)
         end
