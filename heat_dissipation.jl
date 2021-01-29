@@ -54,37 +54,44 @@ function make_halo_smear_cols(temp_matrix_in, conduct_matrix_in, row_num, col_nu
     return (temp_matrix, conduct_matrix)
 end
 
-function do_compute!(row_num, col_num, new_temp_matrix, temp_matrix, conduct_matrix, abs_diff)
-    # max_abs_diff = 0.0
-    # abs_diff = zeros(Float64, col_num * row_num)
+function max_not_nan(x::Float64,y::Float64)
+    return ifelse(x > y, x, y)
+end
+
+function do_compute!(row_num, col_num, new_temp_matrix, temp_matrix, conduct_matrix)
+    max_abs_diff = 0.0
     @inbounds @simd for j in 2:(col_num+1)
         @inbounds @simd for i in 2:(row_num+1)
-            # @views local_temp_matrix = temp_matrix[i-1:i+1 , j-1:j+1]
+            @views local_temp_matrix = temp_matrix[i-1:i+1 , j-1:j+1]
 
-            # direct_neighbors = (local_temp_matrix[1,2] + local_temp_matrix[3,2]
-            #                  + local_temp_matrix[2,1] + local_temp_matrix[2,3])
+            direct_neighbors = (local_temp_matrix[1,2] + local_temp_matrix[3,2]
+                             + local_temp_matrix[2,1] + local_temp_matrix[2,3])
+
+            indirect_neighbours = (local_temp_matrix[1,1] + local_temp_matrix[1,3]
+                                + local_temp_matrix[3,1] + local_temp_matrix[3,3])
+
+            weight = conduct_matrix[i, j]
+            rest_weight = 1 - weight
+
+            new_temp_matrix[i, j] = (local_temp_matrix[2, 2] *weight
+                                  + direct_neighbors * (rest_weight * direct_fixed)
+                                  + indirect_neighbours * (rest_weight * indirect_fixed))
+            # direct_neighbors = (temp_matrix[i - 1, j] + temp_matrix[i + 1, j]
+            #                  + temp_matrix[i, j - 1] + temp_matrix[i, j + 1])
             #
-            # indirect_neighbours = (local_temp_matrix[1,1] + local_temp_matrix[1,3]
-            #                     + local_temp_matrix[3,1] + local_temp_matrix[3,3])
+            # indirect_neighbours = (temp_matrix[i - 1, j - 1] + temp_matrix[i - 1, j + 1]
+            #                     + temp_matrix[i + 1, j - 1] + temp_matrix[i + 1, j + 1])
             #
-            # new_temp_matrix[i, j] = (local_temp_matrix[2, 2] * conduct_matrix[i, j]
-            #                       + direct_neighbors * ((1.0 - conduct_matrix[i, j]) * direct_fixed)
-            #                       + indirect_neighbours * ((1.0 - conduct_matrix[i, j]) * indirect_fixed))
-            direct_neighbors = (temp_matrix[i - 1, j] + temp_matrix[i + 1, j]
-                             + temp_matrix[i, j - 1] + temp_matrix[i, j + 1])
-
-            indirect_neighbours = (temp_matrix[i - 1, j - 1] + temp_matrix[i - 1, j + 1]
-                                + temp_matrix[i + 1, j - 1] + temp_matrix[i + 1, j + 1])
-
-            new_temp_matrix[i, j] = (temp_matrix[i, j] * conduct_matrix[i, j]
-                                  + direct_neighbors * ((1.0 - conduct_matrix[i, j]) * direct_fixed)
-                                  + indirect_neighbours * ((1.0 - conduct_matrix[i, j]) * indirect_fixed))
-
-            # max_abs_diff = max(max_abs_diff, abs(new_temp_matrix[i, j] - temp_matrix[i, j]))
-            abs_diff[((i-2)*row_num + (j-1))] = abs(new_temp_matrix[i, j] - temp_matrix[i, j])
+            # weight = conduct_matrix[i, j]
+            # rest_weight = 1 - weight
+            #
+            # new_temp_matrix[i, j] = (temp_matrix[i, j] * weight
+            #                       + direct_neighbors * (rest_weight * direct_fixed)
+            #                       + indirect_neighbours * (rest_weight * indirect_fixed))
+            temp_val = abs(new_temp_matrix[i, j] - temp_matrix[i, j])
+            max_abs_diff = max_not_nan(max_abs_diff, temp_val)
         end
     end
-    max_abs_diff = maximum(abs_diff)
     return (max_abs_diff)
 end
 
@@ -122,8 +129,6 @@ function main(args)
     new_temp_matrix = zeros(Float64, row_num + 2,  col_num + 2)
     new_temp_matrix = deepcopy(temp_matrix)
 
-    abs_diff = zeros(Float64, col_num * row_num)
-
     println("   Iterations        T(min)        T(max)       T(diff)        T(avg)          Time        FLOP/s")
 
     # time loop
@@ -132,7 +137,7 @@ function main(args)
         #swap new and old matrix
         new_temp_matrix, temp_matrix = temp_matrix, new_temp_matrix
         # do the actual simulation
-        max_abs_diff = do_compute!(row_num, col_num, new_temp_matrix, temp_matrix, conduct_matrix, abs_diff)
+        max_abs_diff = do_compute!(row_num, col_num, new_temp_matrix, temp_matrix, conduct_matrix)
         i += 1
 
         #smear columns
