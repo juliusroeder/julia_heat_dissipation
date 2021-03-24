@@ -107,7 +107,7 @@ function main(args)
     reporting_freq = 10
 
     i = 0
-    path_images = "images/pat1_5000x5000.pgm"
+    path_images = "images/pat1_1000x1000.pgm"
     row_num, col_num, temp_matrix1, conduct_matrix1 = read_data(path_images)
     temp_matrix, conduct_matrix = make_halo_smear_cols(temp_matrix1, conduct_matrix1, row_num, col_num)
 
